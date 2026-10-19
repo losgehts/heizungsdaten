@@ -1,19 +1,23 @@
 
 from datetime import datetime
 from pathlib import Path
+import csv
+import io
+import math
 import os
 import sqlite3
+import tempfile
 
-from flask import Flask, render_template, request, redirect, url_for
+from flask import (
+    Flask, render_template, request, redirect, url_for,
+    send_file, abort
+)
 
 app = Flask(__name__)
 
-# Die Datenbank liegt immer neben dieser Datei.
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "daten.db"
 
-
-# Reihenfolge und Bedeutung der Messwerte
 FELDER = [
     ("z_eg", "Zählerstand Wärmemenge EG", "MWh"),
     ("z_og", "Zählerstand Wärmemenge OG", "MWh"),
@@ -29,16 +33,32 @@ FELDER = [
     ("raum_temp_soll", "Angestrebte Raumtemperatur", "°C"),
 ]
 
+# Plausibilitätsgrenzen: inklusive Grenzwerte
+GRENZEN = {
+    "z_eg": (40, 200),
+    "z_og": (40, 200),
+    "z_dg": (40, 200),
+    "vl": (28, 70),
+    "rl": (28, 70),
+    "temp_ged": (-10, 25),
+    "temp": (-10, 25),
+    "kessel_soll": (20, 90),
+    "kessel_ist": (20, 90),
+    "ww_soll": (20, 80),
+    "ww_ist": (20, 80),
+    "raum_temp_soll": (10, 30),
+}
+
+ZAEHLER = {"z_eg", "z_og", "z_dg"}
+
 
 def verbinden():
-    """Eine Verbindung zur SQLite-Datenbank öffnen."""
     db = sqlite3.connect(DB_PATH, timeout=10)
     db.row_factory = sqlite3.Row
     return db
 
 
 def init_db():
-    """Tabellen und Spaltenbeschreibungen anlegen."""
     with verbinden() as db:
         db.execute("""
             CREATE TABLE IF NOT EXISTS messwerte (
@@ -85,24 +105,72 @@ def init_db():
         """, beschreibungen)
 
 
+def zahl_einlesen(eingabe):
+    """Zahlen mit deutschem Dezimalkomma oder Punkt akzeptieren."""
+    return float(eingabe.strip().replace(",", "."))
+
+
+def pruefe_steigende_zaehler(db, zahlen):
+    """Prüft neue Zählerstände gegen den letzten gespeicherten Stand.
+
+       später verbessern: nicht gegen den letzten gespeicherten, 
+       sondern gegen den, der zeitlich davor liegt (z.B. wenn man ältere 
+       Stände nachträgt.)
+    """
+    fehler = []
+
+    bezeichnungen = {
+        "z_eg": "Zählerstand Wärmemenge EG",
+        "z_og": "Zählerstand Wärmemenge OG",
+        "z_dg": "Zählerstand Wärmemenge DG",
+    }
+
+    letzter = db.execute("""
+        SELECT z_eg, z_og, z_dg
+        FROM messwerte
+        ORDER BY datum DESC, uhrzeit DESC, id DESC
+        LIMIT 1
+    """).fetchone()
+
+    # Noch keine Messwerte vorhanden.
+    if letzter is None:
+        return fehler
+
+    for name, bedeutung in bezeichnungen.items():
+        neu = zahlen.get(name)
+
+        # Bereichsfehler werden bereits separat gemeldet.
+        if neu is None:
+            continue
+
+        alt = letzter[name]
+
+        if neu <= alt:
+            fehler.append(
+                f"{bedeutung}: Der neue Wert ({neu:g} MWh) "
+                f"muss größer als der letzte gespeicherte Wert "
+                f"({alt:g} MWh) sein."
+            )
+
+    return fehler
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     jetzt = datetime.now().astimezone()
-    datum_default = jetzt.strftime("%Y-%m-%d")
-    uhrzeit_default = jetzt.strftime("%H:%M")
 
     werte = {
-        "datum": datum_default,
-        "uhrzeit": uhrzeit_default,
+        "datum": jetzt.strftime("%Y-%m-%d"),
+        "uhrzeit": jetzt.strftime("%H:%M"),
         **{name: "" for name, _, _ in FELDER},
+        "raum_temp_soll": "20",
     }
-    werte["raum_temp_soll"] = "20"
 
-    fehler = None
+    fehler = []
+    korrigierte_felder = []
     gespeichert = request.args.get("gespeichert") == "1"
 
     if request.method == "POST":
-        # Eingaben beibehalten, falls die Validierung fehlschlägt.
         werte = {
             "datum": request.form.get("datum", ""),
             "uhrzeit": request.form.get("uhrzeit", ""),
@@ -112,49 +180,87 @@ def index():
             },
         }
 
+        zahlen = {}
+
         try:
-            # Datum und Uhrzeit prüfen.
             datetime.strptime(werte["datum"], "%Y-%m-%d")
+        except ValueError:
+            fehler.append("Bitte ein gültiges Datum angeben.")
+
+        try:
             datetime.strptime(werte["uhrzeit"], "%H:%M")
+        except ValueError:
+            fehler.append("Bitte eine gültige Uhrzeit angeben.")
 
-            # Deutsche Dezimalkommas werden akzeptiert.
-            zahlen = []
-            for name, bedeutung, _ in FELDER:
-                eingabe = werte[name].replace(",", ".")
-                zahl = float(eingabe)
+        for name, bedeutung, einheit in FELDER:
+            try:
+                zahl = zahl_einlesen(werte[name])
 
-                if not __import__("math").isfinite(zahl):
-                    raise ValueError(
-                        f"{bedeutung}: Bitte eine gültige Zahl eingeben."
+                if not math.isfinite(zahl):
+                    raise ValueError
+
+                # Zählerstände über 1000 werden als kWh interpretiert.
+                if name in ZAEHLER and zahl > 1000:
+                    zahl /= 1000
+                    korrigierte_felder.append(name)
+
+                minimum, maximum = GRENZEN[name]
+
+                if not minimum <= zahl <= maximum:
+                    fehler.append(
+                        f"{bedeutung}: {zahl:g} {einheit} liegt "
+                        f"außerhalb des erlaubten Bereichs "
+                        f"({minimum:g} bis {maximum:g} {einheit})."
                     )
+                else:
+                    zahlen[name] = zahl
 
-                zahlen.append(zahl)
+            except (ValueError, TypeError):
+                fehler.append(
+                    f"{bedeutung}: Bitte eine gültige Zahl eingeben."
+                )
 
+        if not fehler:
+            with verbinden() as db:
+                fehler.extend(pruefe_steigende_zaehler(db, zahlen))
+
+        if not fehler:
             spalten = ["datum", "uhrzeit"] + [
                 name for name, _, _ in FELDER
             ]
             platzhalter = ", ".join("?" for _ in spalten)
             spalten_sql = ", ".join(spalten)
 
-            with verbinden() as db:
-                db.execute(
-                    f"INSERT INTO messwerte ({spalten_sql}) "
-                    f"VALUES ({platzhalter})",
-                    [werte["datum"], werte["uhrzeit"], *zahlen],
+            try:
+                with verbinden() as db:
+                    db.execute(
+                        f"INSERT INTO messwerte ({spalten_sql}) "
+                        f"VALUES ({platzhalter})",
+                        [
+                            werte["datum"],
+                            werte["uhrzeit"],
+                            *[zahlen[name] for name, _, _ in FELDER],
+                        ],
+                    )
+
+                return redirect(url_for(
+                    "index",
+                    gespeichert=1,
+                    korrigiert=",".join(korrigierte_felder),
+                ))
+
+            except sqlite3.Error:
+                app.logger.exception("Fehler beim Speichern")
+                fehler.append(
+                    "Speichern fehlgeschlagen. "
+                    "Bitte prüfe die Datenbank."
                 )
 
-            return redirect(url_for("index", gespeichert=1))
-
-        except ValueError as exc:
-            fehler = str(exc) or (
-                "Bitte Datum, Uhrzeit und alle Zahlenwerte prüfen."
-            )
-        except sqlite3.Error:
-            app.logger.exception("Fehler beim Speichern der Messwerte")
-            fehler = (
-                "Die Daten konnten nicht gespeichert werden. "
-                "Bitte prüfe die Anwendung und die Datenbank."
-            )
+    korrigiert = request.args.get("korrigiert", "").split(",")
+    korrigiert = [
+        name for name in korrigiert
+        if name in ZAEHLER
+    ]
 
     with verbinden() as db:
         eintraege = db.execute("""
@@ -169,11 +275,82 @@ def index():
         werte=werte,
         fehler=fehler,
         gespeichert=gespeichert,
+        korrigiert=korrigiert,
         eintraege=eintraege,
     )
 
 
-# Auch beim Start mit einem WSGI-Server initialisieren.
+@app.route("/export/csv")
+def export_csv():
+    """Messwerte mit verständlichen Spaltenüberschriften exportieren."""
+    with verbinden() as db:
+        eintraege = db.execute("""
+            SELECT * FROM messwerte
+            ORDER BY datum, uhrzeit, id
+        """).fetchall()
+
+    ausgabe = io.StringIO(newline="")
+    writer = csv.writer(ausgabe, delimiter=";", lineterminator="\n")
+
+    spalten = [
+        ("id", "ID"),
+        ("datum", "Datum"),
+        ("uhrzeit", "Uhrzeit"),
+    ] + [
+        (name, f"{name} [{einheit}]")
+        for name, _, einheit in FELDER
+    ]
+
+    writer.writerow([titel for _, titel in spalten])
+
+    for eintrag in eintraege:
+        writer.writerow([eintrag[name] for name, _ in spalten])
+
+    datei = io.BytesIO(ausgabe.getvalue().encode("utf-8-sig"))
+    datei.seek(0)
+
+    return send_file(
+        datei,
+        mimetype="text/csv; charset=utf-8",
+        as_attachment=True,
+        download_name="waermedaten.csv",
+    )
+
+
+@app.route("/export/sqlite")
+def export_sqlite():
+    """Konsistenten Snapshot der gesamten SQLite-Datenbank herunterladen."""
+    temp = tempfile.NamedTemporaryFile(
+        prefix="heizungsdaten_",
+        suffix=".db",
+        delete=False,
+    )
+    temp_path = temp.name
+    temp.close()
+
+    try:
+        with sqlite3.connect(DB_PATH, timeout=10) as quelle:
+            with sqlite3.connect(temp_path) as ziel:
+                quelle.backup(ziel)
+
+        antwort = send_file(
+            temp_path,
+            mimetype="application/vnd.sqlite3",
+            as_attachment=True,
+            download_name="heizungsdaten.db",
+        )
+        antwort.call_on_close(
+            lambda: os.path.exists(temp_path)
+            and os.unlink(temp_path)
+        )
+        return antwort
+
+    except Exception:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        raise
+
+
 init_db()
 
 if __name__ == "__main__":

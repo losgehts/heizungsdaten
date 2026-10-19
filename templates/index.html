@@ -13,9 +13,7 @@
             background: #f4f6f8;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             margin: 0;
@@ -27,15 +25,8 @@
             margin: 0 auto;
         }
 
-        h1 {
-            font-size: 1.65rem;
-            margin: 0 0 8px;
-        }
-
-        h2 {
-            font-size: 1.2rem;
-            margin-top: 28px;
-        }
+        h1 { font-size: 1.65rem; margin: 0 0 8px; }
+        h2 { font-size: 1.2rem; margin-top: 28px; }
 
         .hinweis {
             color: #59636e;
@@ -56,9 +47,7 @@
             gap: 16px;
         }
 
-        .zeitfelder {
-            margin-bottom: 22px;
-        }
+        .zeitfelder { margin-bottom: 22px; }
 
         label {
             display: block;
@@ -92,23 +81,27 @@
             border-color: #2563eb;
         }
 
-        button {
+        button, .download {
+            display: block;
             width: 100%;
-            margin-top: 24px;
-            padding: 14px;
+            padding: 13px;
             border: 0;
             border-radius: 8px;
-            background: #1769aa;
-            color: white;
             font: inherit;
-            font-size: 1.05rem;
             font-weight: 700;
+            text-align: center;
+            text-decoration: none;
             cursor: pointer;
         }
 
-        button:hover {
-            background: #12558b;
+        button {
+            margin-top: 24px;
+            background: #1769aa;
+            color: white;
+            font-size: 1.05rem;
         }
+
+        button:hover { background: #12558b; }
 
         .meldung {
             padding: 12px;
@@ -125,6 +118,38 @@
             background: #fde8e7;
             color: #922b25;
         }
+
+        .korrektur {
+            background: #fff4d6;
+            color: #714b00;
+        }
+
+        .meldung ul {
+            margin-bottom: 0;
+            padding-left: 22px;
+        }
+
+        .export {
+            margin-top: 24px;
+            padding: 18px;
+            background: white;
+            border-radius: 12px;
+        }
+
+        .export h2 { margin-top: 0; }
+
+        .export-links {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .download {
+            background: #e8eef5;
+            color: #173d62;
+        }
+
+        .download:hover { background: #d8e5f2; }
 
         .eintrag {
             background: white;
@@ -146,23 +171,16 @@
         }
 
         @media (max-width: 520px) {
-            body {
-                padding: 14px 10px 28px;
-            }
-
-            .karte {
-                padding: 15px;
-            }
+            body { padding: 14px 10px 28px; }
+            .karte { padding: 15px; }
 
             .zeitfelder,
-            .messfelder {
+            .messfelder,
+            .export-links {
                 grid-template-columns: minmax(0, 1fr);
-                gap: 13px;
             }
 
-            h1 {
-                font-size: 1.4rem;
-            }
+            h1 { font-size: 1.4rem; }
         }
     </style>
 </head>
@@ -181,9 +199,27 @@
             </div>
         {% endif %}
 
+        {% if korrigiert %}
+            <div class="meldung korrektur" role="status">
+                <strong>Zählerstände automatisch umgerechnet</strong>
+                <ul>
+                    {% for name, bedeutung, einheit in felder %}
+                        {% if name in korrigiert %}
+                            <li>{{ bedeutung }}: Eingabe wurde durch 1000 geteilt und als MWh gespeichert.</li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
         {% if fehler %}
             <div class="meldung fehler" role="alert">
-                {{ fehler }}
+                <strong>Bitte Eingaben prüfen:</strong>
+                <ul>
+                    {% for meldung in fehler %}
+                        <li>{{ meldung }}</li>
+                    {% endfor %}
+                </ul>
             </div>
         {% endif %}
 
@@ -234,6 +270,23 @@
 
             <button type="submit">Messwerte speichern</button>
         </form>
+    </section>
+
+    <section class="export">
+        <h2>Daten exportieren</h2>
+        <p class="hinweis">
+            Lade alle gespeicherten Messwerte herunter.
+        </p>
+
+        <div class="export-links">
+            <a class="download" href="{{ url_for('export_csv') }}">
+                CSV herunterladen
+            </a>
+
+            <a class="download" href="{{ url_for('export_sqlite') }}">
+                SQLite-Datenbank herunterladen
+            </a>
+        </div>
     </section>
 
     <h2>Letzte 20 Einträge</h2>
