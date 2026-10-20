@@ -15,6 +15,8 @@ from flask import (
 
 app = Flask(__name__)
 
+VERSION = "0.01"
+
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "daten.db"
 
@@ -271,6 +273,7 @@ def index():
 
     return render_template(
         "index.html",
+        version=VERSION,
         felder=FELDER,
         werte=werte,
         fehler=fehler,
