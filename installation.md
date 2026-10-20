@@ -60,14 +60,14 @@ SQLite wird bereits von Python unterstützt. Ein separater Datenbankserver ist n
 Wir verwenden ein eigenes Verzeichnis im Home-Verzeichnis des Benutzers:
 
 ```bash
-mkdir -p ~/waermedaten/templates
-cd ~/waermedaten
+mkdir -p ~/heizungsdaten/templates
+cd ~/heizungsdaten
 ```
 
 Die Verzeichnisstruktur sieht später so aus:
 
 ```text
-~/waermedaten/
+~/heizungsdaten/
 ├── app.py
 ├── templates/
 │   └── index.html
@@ -81,11 +81,11 @@ Die Dateien `app.py` und `templates/index.html` enthalten deinen bereits entwick
 
 Führe diese Befehle auf deinem Linux-Mint-Rechner aus, nicht innerhalb der SSH-Sitzung.
 
-Wenn dein lokales Projekt unter `~/waermedaten/` liegt:
+Wenn dein lokales Projekt unter `~/heizungsdaten/` liegt:
 
 ```bash
-scp ~/waermedaten/app.py BENUTZERNAME@raspberrypi.local:~/waermedaten/
-scp ~/waermedaten/templates/index.html BENUTZERNAME@raspberrypi.local:~/waermedaten/templates/
+scp ~/heizungsdaten/app.py BENUTZERNAME@raspberrypi.local:~/heizungsdaten/
+scp ~/heizungsdaten/templates/index.html BENUTZERNAME@raspberrypi.local:~/heizungsdaten/templates/
 ```
 
 Ersetze `BENUTZERNAME` und gegebenenfalls `raspberrypi.local`.
@@ -97,7 +97,7 @@ Alternativ kannst du die Dateien mit `scp` über die IP-Adresse übertragen.
 Wenn du deine bereits erfassten Messwerte vom Entwicklungsrechner übernehmen möchtest, kopiere auch die Datenbank:
 
 ```bash
-scp ~/waermedaten/daten.db BENUTZERNAME@raspberrypi.local:~/waermedaten/
+scp ~/heizungsdaten/daten.db BENUTZERNAME@raspberrypi.local:~/heizungsdaten/
 ```
 
 **Wichtig:** Wenn auf dem Pi bereits eine Datenbank mit Messwerten existiert, überschreibe sie nicht versehentlich. Sichere die vorhandene Datei vorher.
@@ -115,7 +115,7 @@ ssh BENUTZERNAME@raspberrypi.local
 Wechsle in das Projektverzeichnis:
 
 ```bash
-cd ~/waermedaten
+cd ~/heizungsdaten
 ```
 
 Erstelle eine virtuelle Python-Umgebung:
@@ -137,7 +137,7 @@ Die virtuelle Umgebung sorgt dafür, dass die Python-Abhängigkeiten der App get
 Starte die App manuell:
 
 ```bash
-cd ~/waermedaten
+cd ~/heizungsdaten
 .venv/bin/python app.py
 ```
 
@@ -178,21 +178,21 @@ Damit die App nach einem Neustart automatisch läuft, richten wir einen Systemdi
 Öffne auf dem Pi eine neue Dienstdatei:
 
 ```bash
-sudo nano /etc/systemd/system/waermedaten.service
+sudo nano /etc/systemd/system/heizungsdaten.service
 ```
 
 Füge folgenden Inhalt ein. Ersetze `BENUTZERNAME` durch deinen tatsächlichen Linux-Benutzernamen:
 
 ```ini
 [Unit]
-Description=Waermedaten Flask Anwendung
+Description=heizungsdaten Flask Anwendung
 After=network.target
 
 [Service]
 Type=simple
 User=BENUTZERNAME
-WorkingDirectory=/home/BENUTZERNAME/waermedaten
-ExecStart=/home/BENUTZERNAME/waermedaten/.venv/bin/python /home/BENUTZERNAME/waermedaten/app.py
+WorkingDirectory=/home/BENUTZERNAME/heizungsdaten
+ExecStart=/home/BENUTZERNAME/heizungsdaten/.venv/bin/python /home/BENUTZERNAME/heizungsdaten/app.py
 Restart=on-failure
 RestartSec=5
 
@@ -214,19 +214,19 @@ sudo systemctl daemon-reload
 Aktiviere den automatischen Start:
 
 ```bash
-sudo systemctl enable waermedaten.service
+sudo systemctl enable heizungsdaten.service
 ```
 
 Starte den Dienst:
 
 ```bash
-sudo systemctl start waermedaten.service
+sudo systemctl start heizungsdaten.service
 ```
 
 Prüfe den Status:
 
 ```bash
-sudo systemctl status waermedaten.service
+sudo systemctl status heizungsdaten.service
 ```
 
 Wenn der Dienst erfolgreich läuft, sollte der Status `active (running)` angezeigt werden.
@@ -236,13 +236,13 @@ Wenn der Dienst erfolgreich läuft, sollte der Status `active (running)` angezei
 Falls die Anwendung nicht startet oder Fehler auftreten:
 
 ```bash
-sudo journalctl -u waermedaten.service -n 100 --no-pager
+sudo journalctl -u heizungsdaten.service -n 100 --no-pager
 ```
 
 Die laufenden Protokolle kannst du so verfolgen:
 
 ```bash
-sudo journalctl -u waermedaten.service -f
+sudo journalctl -u heizungsdaten.service -f
 ```
 
 Beende die Live-Anzeige mit `Ctrl+C`.
@@ -252,7 +252,7 @@ Beende die Live-Anzeige mit `Ctrl+C`.
 Die Datenbank liegt hier:
 
 ```text
-/home/BENUTZERNAME/waermedaten/daten.db
+/home/BENUTZERNAME/heizungsdaten/daten.db
 ```
 
 Sie enthält:
@@ -272,7 +272,7 @@ Eine SQLite-Datenbank ist nur eine Datei. Trotzdem solltest du regelmäßig eine
 Für eine manuelle Sicherung auf deinem Linux-Mint-Rechner:
 
 ```bash
-scp BENUTZERNAME@raspberrypi.local:~/waermedaten/daten.db ~/waermedaten-sicherung.db
+scp BENUTZERNAME@raspberrypi.local:~/heizungsdaten/daten.db ~/heizungsdaten-sicherung.db
 ```
 
 Für wichtige Daten empfiehlt sich eine regelmäßige automatische Sicherung auf ein anderes Gerät oder einen anderen Datenträger. Eine Sicherung ausschließlich auf derselben SD-Karte schützt nicht vor deren Ausfall.
@@ -282,20 +282,20 @@ Für wichtige Daten empfiehlt sich eine regelmäßige automatische Sicherung auf
 Wenn du später den Code auf Linux Mint änderst, übertrage die geänderten Dateien erneut:
 
 ```bash
-scp ~/waermedaten/app.py BENUTZERNAME@raspberrypi.local:~/waermedaten/
-scp ~/waermedaten/templates/index.html BENUTZERNAME@raspberrypi.local:~/waermedaten/templates/
+scp ~/heizungsdaten/app.py BENUTZERNAME@raspberrypi.local:~/heizungsdaten/
+scp ~/heizungsdaten/templates/index.html BENUTZERNAME@raspberrypi.local:~/heizungsdaten/templates/
 ```
 
 Starte danach den Dienst auf dem Pi neu:
 
 ```bash
-sudo systemctl restart waermedaten.service
+sudo systemctl restart heizungsdaten.service
 ```
 
 Prüfe anschließend:
 
 ```bash
-sudo systemctl status waermedaten.service
+sudo systemctl status heizungsdaten.service
 ```
 
 **Achtung:** Übertrage nicht bei jeder Codeänderung unüberlegt die lokale `daten.db`. Sonst könntest du die inzwischen auf dem Pi gespeicherten Messwerte überschreiben.
