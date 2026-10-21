@@ -15,23 +15,23 @@ from flask import (
 
 app = Flask(__name__)
 
-VERSION = "0.01"
+VERSION = "0.02"
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "daten.db"
 
 FELDER = [
-    ("z_eg", "Zählerstand Wärmemenge EG", "MWh"),
-    ("z_og", "Zählerstand Wärmemenge OG", "MWh"),
     ("z_dg", "Zählerstand Wärmemenge DG", "MWh"),
+    ("z_og", "Zählerstand Wärmemenge OG", "MWh"),
+    ("z_eg", "Zählerstand Wärmemenge EG", "MWh"),
     ("vl", "Vorlauftemperatur", "°C"),
     ("rl", "Rücklauftemperatur", "°C"),
-    ("temp_ged", "Außentemperatur gedeckelt", "°C"),
+    ("temp_ged", "Außentemperatur ged.", "°C"),
     ("temp", "Außentemperatur Ist", "°C"),
-    ("kessel_soll", "Kessel Solltemperatur", "°C"),
-    ("kessel_ist", "Kessel Isttemperatur", "°C"),
-    ("ww_soll", "Warmwasser Solltemperatur", "°C"),
-    ("ww_ist", "Warmwasser Isttemperatur", "°C"),
+    ("kessel_soll", "Kessel Soll Temperatur", "°C"),
+    ("kessel_ist", "Kessel Ist Temperatur", "°C"),
+    ("ww_soll", "Warmwasser Soll Temperatur", "°C"),
+    ("ww_ist", "Warmwasser Ist Temperatur", "°C"),
     ("raum_temp_soll", "Angestrebte Raumtemperatur", "°C"),
 ]
 
@@ -122,9 +122,9 @@ def pruefe_steigende_zaehler(db, zahlen):
     fehler = []
 
     bezeichnungen = {
-        "z_eg": "Zählerstand Wärmemenge EG",
-        "z_og": "Zählerstand Wärmemenge OG",
         "z_dg": "Zählerstand Wärmemenge DG",
+        "z_og": "Zählerstand Wärmemenge OG",
+        "z_eg": "Zählerstand Wärmemenge EG",
     }
 
     letzter = db.execute("""
@@ -316,7 +316,7 @@ def export_csv():
         datei,
         mimetype="text/csv; charset=utf-8",
         as_attachment=True,
-        download_name="waermedaten.csv",
+        download_name=f'heizungsdaten_{datetime.now().strftime("%Y-%m-%d_%H-%M")}.csv',
     )
 
 
@@ -340,7 +340,7 @@ def export_sqlite():
             temp_path,
             mimetype="application/vnd.sqlite3",
             as_attachment=True,
-            download_name="heizungsdaten.db",
+            download_name=f'heizungsdaten_{datetime.now().strftime("%Y-%m-%d_%H-%M")}.db',
         )
         antwort.call_on_close(
             lambda: os.path.exists(temp_path)
