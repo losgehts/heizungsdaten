@@ -15,7 +15,7 @@ from flask import (
 
 app = Flask(__name__)
 
-VERSION = "0.02"
+VERSION = "0.03"
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "daten.db"
@@ -50,9 +50,6 @@ GRENZEN = {
     "ww_ist": (20, 80),
     "raum_temp_soll": (10, 30),
 }
-
-ZAEHLER = {"z_eg", "z_og", "z_dg"}
-
 
 def verbinden():
     db = sqlite3.connect(DB_PATH, timeout=10)
@@ -169,7 +166,6 @@ def index():
     }
 
     fehler = []
-    korrigierte_felder = []
     gespeichert = request.args.get("gespeichert") == "1"
 
     if request.method == "POST":
@@ -200,11 +196,6 @@ def index():
 
                 if not math.isfinite(zahl):
                     raise ValueError
-
-                # Zählerstände über 1000 werden als kWh interpretiert.
-                if name in ZAEHLER and zahl > 1000:
-                    zahl /= 1000
-                    korrigierte_felder.append(name)
 
                 minimum, maximum = GRENZEN[name]
 
@@ -248,7 +239,6 @@ def index():
                 return redirect(url_for(
                     "index",
                     gespeichert=1,
-                    korrigiert=",".join(korrigierte_felder),
                 ))
 
             except sqlite3.Error:
@@ -258,11 +248,6 @@ def index():
                     "Bitte prüfe die Datenbank."
                 )
 
-    korrigiert = request.args.get("korrigiert", "").split(",")
-    korrigiert = [
-        name for name in korrigiert
-        if name in ZAEHLER
-    ]
 
     with verbinden() as db:
         eintraege = db.execute("""
@@ -278,7 +263,6 @@ def index():
         werte=werte,
         fehler=fehler,
         gespeichert=gespeichert,
-        korrigiert=korrigiert,
         eintraege=eintraege,
     )
 

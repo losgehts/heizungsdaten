@@ -192,6 +192,17 @@
             font-size: 0.8rem;
             border-top: 1px solid #dce1e6;
         }
+
+        .zaehler-hinweis {
+            display: block;
+            margin-top: 5px;
+            font-size: 0.85rem;
+            color: #17652b;
+        }
+
+        .zaehler-hinweis:empty {
+            display: none;
+        }
     </style>
 </head>
 
@@ -206,19 +217,6 @@
         {% if gespeichert %}
             <div class="meldung erfolg" role="status">
                 Messwerte wurden erfolgreich gespeichert.
-            </div>
-        {% endif %}
-
-        {% if korrigiert %}
-            <div class="meldung korrektur" role="status">
-                <strong>Zählerstände automatisch umgerechnet</strong>
-                <ul>
-                    {% for name, bedeutung, einheit in felder %}
-                        {% if name in korrigiert %}
-                            <li>{{ bedeutung }}: Eingabe wurde durch 1000 geteilt und als MWh gespeichert.</li>
-                        {% endif %}
-                    {% endfor %}
-                </ul>
             </div>
         {% endif %}
 
@@ -259,25 +257,38 @@
             </div>
 
             <div class="messfelder">
-                {% for name, bedeutung, einheit in felder %}
-                    <label for="{{ name }}">
-                        {{ bedeutung }}
-                        <span class="einheit">({{ einheit }})</span>
+            {% for name, bedeutung, einheit in felder %}
+                <label for="{{ name }}">
+                    {{ bedeutung }}
+                    <span class="einheit">({{ einheit }})</span>
 
-                        <input
-                            id="{{ name }}"
-                            name="{{ name }}"
-                            type="number"
+                    <input
+                        id="{{ name }}"
+                        name="{{ name }}"
+                        type="{{ 'text' if name in ['z_eg', 'z_og', 'z_dg'] else 'number' }}"
+                        {% if name in ['z_eg', 'z_og', 'z_dg'] %}
+                            inputmode="decimal"
+                            autocomplete="off"
+                            class="zaehler"
+                            aria-describedby="{{ name }}_hinweis"
+                        {% else %}
                             step="any"
                             inputmode="decimal"
-                            value="{{ werte[name] }}"
-                            {% if loop.first %}autofocus{% endif %}
-                            required
-                        >
-                    </label>
-                {% endfor %}
-            </div>
+                        {% endif %}
+                        value="{{ werte[name] }}"
+                        {% if loop.first %}autofocus{% endif %}
+                        required
+                    >
 
+                    {% if name in ['z_eg', 'z_og', 'z_dg'] %}
+                        <span
+                            id="{{ name }}_hinweis"
+                            class="zaehler-hinweis"
+                            aria-live="polite"
+                        ></span>
+                    {% endif %}
+                </label>
+            {% endfor %}            </div>
             <button type="submit">Messwerte speichern</button>
         </form>
     </section>
@@ -320,5 +331,43 @@
 <footer class="footer">
     Version {{ version }}
 </footer>
+<script>
+    document.querySelectorAll(".zaehler").forEach(feld => {
+        const hinweis = document.getElementById(
+            `${feld.id}_hinweis`
+        );
+
+        feld.addEventListener("input", () => {
+            hinweis.textContent = "";
+        });
+
+        feld.addEventListener("blur", () => {
+            const eingabe = feld.value.trim();
+
+            // Nur ganze Zahlen ohne Dezimaltrennzeichen umrechnen.
+            if (!/^\d+$/.test(eingabe)) {
+                return;
+            }
+
+            const zahl = Number(eingabe);
+
+            if (zahl <= 999) {
+                return;
+            }
+
+            // kWh -> MWh
+            const korrigiert = zahl / 1000;
+
+            feld.value = korrigiert.toLocaleString("de-DE", {
+                useGrouping: false,
+                maximumFractionDigits: 3
+            });
+
+            hinweis.textContent =
+                "Eingabe vermutlich in kWh: durch 1000 geteilt, " +
+                "jetzt MWh. Bitte Wert prüfen.";
+        });
+    });
+</script>
 </body>
 </html>
