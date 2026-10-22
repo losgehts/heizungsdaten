@@ -37,9 +37,9 @@ FELDER = [
 
 # Plausibilitätsgrenzen: inklusive Grenzwerte
 GRENZEN = {
-    "z_eg": (40, 200),
-    "z_og": (40, 200),
     "z_dg": (40, 200),
+    "z_og": (40, 200),
+    "z_eg": (40, 200),
     "vl": (28, 70),
     "rl": (28, 70),
     "temp_ged": (-10, 25),
