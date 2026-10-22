@@ -13,20 +13,9 @@ Die Anwendung verwendet Flask und SQLite. Die Datenbank wird automatisch angeleg
 ## 1. Per SSH mit dem Raspberry Pi verbinden
 
 Öffne auf deinem Linux-Mint-Rechner ein Terminal.
-
-```bash
-ssh BENUTZERNAME@raspberrypi.local
-```
-
-Ersetze `BENUTZERNAME` durch deinen tatsächlichen Benutzernamen auf dem Pi.
-
-Falls der Hostname nicht funktioniert, verwende die IP-Adresse des Raspberry Pi:
-
 ```bash
 ssh BENUTZERNAME@192.168.1.50
 ```
-
-Die IP-Adresse ist hier nur ein Beispiel.
 
 ## 2. System aktualisieren
 
@@ -37,14 +26,6 @@ sudo apt update
 sudo apt upgrade -y
 ```
 
-Falls ein Kernel- oder Firmware-Update einen Neustart erfordert:
-
-```bash
-sudo reboot
-```
-
-Verbinde dich anschließend erneut per SSH.
-
 ## 3. Python und benötigte Pakete installieren
 
 Installiere die benötigten Komponenten:
@@ -53,11 +34,7 @@ Installiere die benötigten Komponenten:
 sudo apt install -y python3 python3-venv
 ```
 
-SQLite wird bereits von Python unterstützt. Ein separater Datenbankserver ist nicht erforderlich.
-
 ## 4. Projektverzeichnis anlegen
-
-Wir verwenden ein eigenes Verzeichnis im Home-Verzeichnis des Benutzers:
 
 ```bash
 mkdir -p ~/heizungsdaten/templates
@@ -75,7 +52,7 @@ Die Verzeichnisstruktur sieht später so aus:
 └── .venv/
 ```
 
-Die Dateien `app.py` und `templates/index.html` enthalten deinen bereits entwickelten Anwendungscode. Die Datei `daten.db` wird automatisch erstellt.
+Die Dateien `app.py` und `templates/index.html` enthalten den entwickelten Anwendungscode. Die Datei `daten.db` wird automatisch erstellt.
 
 ## 5. Anwendung vom Linux-Mint-Rechner übertragen
 
@@ -89,8 +66,6 @@ scp ~/heizungsdaten/templates/index.html BENUTZERNAME@raspberrypi.local:~/heizun
 ```
 
 Ersetze `BENUTZERNAME` und gegebenenfalls `raspberrypi.local`.
-
-Alternativ kannst du die Dateien mit `scp` über die IP-Adresse übertragen.
 
 ### Optional: Bestehende Datenbank übertragen
 
@@ -130,8 +105,6 @@ Installiere Flask:
 .venv/bin/pip install Flask
 ```
 
-Die virtuelle Umgebung sorgt dafür, dass die Python-Abhängigkeiten der App getrennt vom übrigen System installiert werden.
-
 ## 7. Anwendung erstmals starten
 
 Starte die App manuell:
@@ -146,30 +119,6 @@ Beim ersten Start wird die SQLite-Datenbank automatisch angelegt, sofern sie noc
 Standardmäßig lauscht Flask auf Port 5000 und auf allen Netzwerkinterfaces, weil die Anwendung `host="0.0.0.0"` verwendet.
 
 Beende den Testlauf mit `Ctrl+C`.
-
-## 8. IP-Adresse des Raspberry Pi ermitteln
-
-Auf dem Pi:
-
-```bash
-hostname -I
-```
-
-Notiere die lokale IP-Adresse, beispielsweise `192.168.1.50`.
-
-Rufe die Anwendung anschließend auf einem Laptop oder Smartphone im selben Heimnetzwerk auf:
-
-```text
-http://192.168.1.50:5000
-```
-
-Verwende dabei die tatsächliche IP-Adresse deines Raspberry Pi.
-
-Wenn die Seite nicht erreichbar ist, prüfe:
-- Ist der Pi über Ethernet mit dem Router verbunden?
-- Sind Smartphone und Pi im selben lokalen Netzwerk?
-- Lauscht Flask auf Port 5000?
-- Blockiert eine Firewall die Verbindung?
 
 ## 9. Automatischen Start mit systemd einrichten
 
@@ -201,9 +150,6 @@ WantedBy=multi-user.target
 ```
 
 Speichern und schließen:
-- `Ctrl+O`
-- `Enter`
-- `Ctrl+X`
 
 Lade die Dienstdefinition neu:
 
@@ -274,8 +220,6 @@ Für eine manuelle Sicherung auf deinem Linux-Mint-Rechner:
 ```bash
 scp BENUTZERNAME@raspberrypi.local:~/heizungsdaten/daten.db ~/heizungsdaten-sicherung.db
 ```
-
-Für wichtige Daten empfiehlt sich eine regelmäßige automatische Sicherung auf ein anderes Gerät oder einen anderen Datenträger. Eine Sicherung ausschließlich auf derselben SD-Karte schützt nicht vor deren Ausfall.
 
 ## 13. Anwendung aktualisieren
 
